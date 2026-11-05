@@ -1,7 +1,21 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
   <url>
     <loc>https://dideedesigners.in/</loc>
-    <lastmod>2026-11-02</lastmod>
+    <lastmod>2026-11-05</lastmod>
+    <image:image><image:loc>https://dideedesigners.in/16-hero-new.webp</image:loc></image:image>
+    <image:image><image:loc>https://dideedesigners.in/15-detail.webp</image:loc></image:image>
+    <image:image><image:loc>https://dideedesigners.in/19-look-c.webp</image:loc></image:image>
+    <image:image><image:loc>https://dideedesigners.in/23-tier-pressed.webp</image:loc></image:image>
+    <image:image><image:loc>https://dideedesigners.in/27-tier-semifluffy.webp</image:loc></image:image>
+    <image:image><image:loc>https://dideedesigners.in/22-tier-fullfluffy.webp</image:loc></image:image>
+  </url>
+  <url>
+    <loc>https://dideedesigners.in/faq</loc>
+    <lastmod>2026-11-05</lastmod>
+  </url>
+  <url>
+    <loc>https://dideedesigners.in/privacy</loc>
+    <lastmod>2026-11-05</lastmod>
   </url>
 </urlset>
