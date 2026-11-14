@@ -17,7 +17,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 VALIDATOR = ROOT / "scripts" / "validate_seo.py"
-POLICY = ("Pickup and delivery are free for orders of more than 5 sarees from one customer. "
+POLICY = ("For saree pre-pleating orders, pickup and delivery are free for orders of more than 5 sarees from one customer. "
           "For 5 sarees or fewer, pickup and delivery are chargeable and the charge depends on your location.")
 
 # attack name -> (text appended right after the policy sentence, name of the check that must fail)
