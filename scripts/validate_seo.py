@@ -21,7 +21,7 @@ FORBIDDEN_TEXT = [r"\bAggregateRating\b", r"\bstar rating", r"★", r"\bcustomer
                   r"\bopen (daily|24)", r"\bopening hours\b", r"\bsince (19|20)\d\d\b", r"\bfounded in\b", r"\byears of experience\b",
                   r"\bwe sell sarees\b",
                   # unverified service promises / quality claims (owner review before re-adding)
-                  r"\bpick-?up\b", r"\bdoorstep\b", r"\bdeliver(y|ies)\b", r"\bexpress\b", r"\bbulk\b", r"\bsilk\b", r"\bbridal\b",
+                  r"\bdoorstep\b", r"\bexpress\b", r"\bbulk\b", r"\bsilk\b", r"\bbridal\b",
                   r"\bappointments?\b", r"\bpersonal care\b", r"\bgentle\b", r"\beven pleats\b"]
 FORBIDDEN_SCHEMA_KEYS = {"aggregateRating", "review", "geo", "openingHours", "openingHoursSpecification", "streetAddress",
                          "postalCode", "foundingDate", "latitude", "longitude", "speakable"}
@@ -197,6 +197,32 @@ if home:
     hv = " ".join(home.text)
     check(all(f"₹{v}" in hv for v in PRICES.values()), "homepage shows ₹250/₹300/₹400")
     check("pre-pleating" in home.h1[0].lower() and "draping" in home.h1[0].lower(), "homepage H1 names both services")
+
+# --- pickup & delivery policy (owner-approved sentence; nothing broader or more specific may appear)
+POLICY = ("Pickup and delivery are free for orders of more than 5 sarees from one customer. "
+          "For 5 sarees or fewer, pickup and delivery are chargeable and the charge depends on your location.")
+FREE_RE = r"free[^.]{0,60}(pick-?up|deliver)|(pick-?up|deliver)[^.]{0,60}free"
+CHARGE_RE = r"(?:₹|rs\.?\s?)\s?\d[\d,]*[^.]{0,40}(pick-?up|deliver)|(pick-?up|deliver)[^.]{0,40}(?:₹|rs\.?\s?)\s?\d"
+TIME_RE = r"(pick-?up|deliver\w*)[^.]{0,60}\b(within|in|under)\s+\d+\s*(hours?|days?|mins?|minutes?)"
+for f, p in indexable.items():
+    vis = " ".join(" ".join(p.text).split())
+    if p.route in ("/saree-pre-pleating/", "/faq"):
+        check(POLICY in vis, f"approved pickup/delivery policy sentence is visible on {p.route}")
+    rest = vis.replace(POLICY, "")
+    check(not re.search(FREE_RE, rest, re.I), f"no free pickup/delivery claim outside the approved sentence on {p.route}")
+    check(not re.search(CHARGE_RE, rest, re.I), f"no fixed pickup/delivery charge on {p.route}")
+    check(not re.search(TIME_RE, rest, re.I), f"no pickup/delivery time promise on {p.route}")
+    if p.route == "/faq":
+        check(any(POLICY == a for _, a in p.faq), "policy sentence is an exact visible FAQ answer")
+for name in ("terms.html", "llms.txt"):
+    t = (ROOT / name).read_text(encoding="utf-8")
+    if name == "terms.html":
+        t = " ".join(pages[ROOT / name].text)
+    t = " ".join(t.split())
+    check(POLICY in t, f"approved pickup/delivery policy sentence is present in {name}")
+    rest = t.replace(POLICY, "")
+    check(not re.search(FREE_RE, rest, re.I), f"no free pickup/delivery claim outside the approved sentence in {name}")
+    check(not re.search(CHARGE_RE, rest, re.I), f"no fixed pickup/delivery charge in {name}")
 
 # --- links / images
 for f, p in pages.items():
