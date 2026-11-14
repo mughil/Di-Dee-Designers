@@ -204,25 +204,59 @@ POLICY = ("Pickup and delivery are free for orders of more than 5 sarees from on
 FREE_RE = r"free[^.]{0,60}(pick-?up|deliver)|(pick-?up|deliver)[^.]{0,60}free"
 CHARGE_RE = r"(?:₹|rs\.?\s?)\s?\d[\d,]*[^.]{0,40}(pick-?up|deliver)|(pick-?up|deliver)[^.]{0,40}(?:₹|rs\.?\s?)\s?\d"
 TIME_RE = r"(pick-?up|deliver\w*)[^.]{0,60}\b(within|in|under)\s+\d+\s*(hours?|days?|mins?|minutes?)"
+POLICY_RULES = (("free pickup/delivery claim outside the approved sentence", FREE_RE),
+                ("fixed pickup/delivery charge", CHARGE_RE),
+                ("pickup/delivery time promise", TIME_RE))
+
+
+def _squash(t):
+    return " ".join(t.split())
+
+
+def _json_strings(o, out):
+    if isinstance(o, str):
+        out.append(o)
+    elif isinstance(o, dict):
+        for v in o.values():
+            _json_strings(v, out)
+    elif isinstance(o, list):
+        for v in o:
+            _json_strings(v, out)
+
+
+def _jsonld_text(blocks):
+    out = []
+    for b in blocks:
+        try:
+            _json_strings(json.loads(b), out)
+        except ValueError:
+            pass  # invalid JSON-LD is reported by the JSON-LD checks above
+    return _squash(" . ".join(out))  # ' . ' stops regexes matching across separate strings
+
+
+def _policy_checks(label, text):
+    rest = text.replace(POLICY, "")
+    for what, rx in POLICY_RULES:
+        check(not re.search(rx, rest, re.I), f"no {what} {label}")
+
+
 for f, p in indexable.items():
-    vis = " ".join(" ".join(p.text).split())
+    vis = _squash(" ".join(p.text))
     if p.route in ("/saree-pre-pleating/", "/faq"):
         check(POLICY in vis, f"approved pickup/delivery policy sentence is visible on {p.route}")
-    rest = vis.replace(POLICY, "")
-    check(not re.search(FREE_RE, rest, re.I), f"no free pickup/delivery claim outside the approved sentence on {p.route}")
-    check(not re.search(CHARGE_RE, rest, re.I), f"no fixed pickup/delivery charge on {p.route}")
-    check(not re.search(TIME_RE, rest, re.I), f"no pickup/delivery time promise on {p.route}")
+    _policy_checks(f"on {p.route}", vis)
+    _policy_checks(f"in JSON-LD on {p.route}", _jsonld_text(p.ld))
     if p.route == "/faq":
         check(any(POLICY == a for _, a in p.faq), "policy sentence is an exact visible FAQ answer")
+        faq_ld = _jsonld_text(p.ld)
+        check(POLICY in faq_ld, "approved pickup/delivery policy sentence is in the FAQPage JSON-LD")
 for name in ("terms.html", "llms.txt"):
     t = (ROOT / name).read_text(encoding="utf-8")
     if name == "terms.html":
         t = " ".join(pages[ROOT / name].text)
-    t = " ".join(t.split())
+    t = _squash(t)
     check(POLICY in t, f"approved pickup/delivery policy sentence is present in {name}")
-    rest = t.replace(POLICY, "")
-    check(not re.search(FREE_RE, rest, re.I), f"no free pickup/delivery claim outside the approved sentence in {name}")
-    check(not re.search(CHARGE_RE, rest, re.I), f"no fixed pickup/delivery charge in {name}")
+    _policy_checks(f"in {name}", t)
 
 # --- links / images
 for f, p in pages.items():
