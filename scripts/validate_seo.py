@@ -19,7 +19,10 @@ PRICES = {"Box folding (pressed pleats)": 250, "Semi-fluffy pleats": 300, "Full-
 # Claims the owner has not verified; must never appear in schema or visible text of indexable pages.
 FORBIDDEN_TEXT = [r"\bAggregateRating\b", r"\bstar rating", r"★", r"\bcustomer reviews?\b", r"\bcertified\b", r"\baward[- ]winning\b",
                   r"\bopen (daily|24)", r"\bopening hours\b", r"\bsince (19|20)\d\d\b", r"\bfounded in\b", r"\byears of experience\b",
-                  r"\bwe sell sarees\b"]
+                  r"\bwe sell sarees\b",
+                  # unverified service promises / quality claims (owner review before re-adding)
+                  r"\bpick-?up\b", r"\bdoorstep\b", r"\bdeliver(y|ies)\b", r"\bexpress\b", r"\bbulk\b", r"\bsilk\b", r"\bbridal\b",
+                  r"\bappointments?\b", r"\bpersonal care\b", r"\bgentle\b", r"\beven pleats\b"]
 FORBIDDEN_SCHEMA_KEYS = {"aggregateRating", "review", "geo", "openingHours", "openingHoursSpecification", "streetAddress",
                          "postalCode", "foundingDate", "latitude", "longitude", "speakable"}
 FORBIDDEN_SCHEMA_TYPES = {"HowTo", "HowToStep", "AggregateRating", "Review", "GeoCoordinates", "SpeakableSpecification"}
