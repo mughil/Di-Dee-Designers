@@ -2,12 +2,27 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
   <url>
     <loc>https://dideedesigners.in/</loc>
-    <lastmod>2026-11-11</lastmod>
+    <lastmod>2026-11-14</lastmod>
     <image:image><image:loc>https://dideedesigners.in/16-hero-new.webp</image:loc></image:image>
     <image:image><image:loc>https://dideedesigners.in/15-detail.webp</image:loc></image:image>
     <image:image><image:loc>https://dideedesigners.in/19-look-c.webp</image:loc></image:image>
     <image:image><image:loc>https://dideedesigners.in/23-tier-pressed.webp</image:loc></image:image>
     <image:image><image:loc>https://dideedesigners.in/27-tier-semifluffy.webp</image:loc></image:image>
     <image:image><image:loc>https://dideedesigners.in/22-tier-fullfluffy.webp</image:loc></image:image>
+  </url>
+  <url>
+    <loc>https://dideedesigners.in/saree-pre-pleating/</loc>
+    <lastmod>2026-11-14</lastmod>
+    <image:image><image:loc>https://dideedesigners.in/23-tier-pressed.webp</image:loc></image:image>
+    <image:image><image:loc>https://dideedesigners.in/27-tier-semifluffy.webp</image:loc></image:image>
+    <image:image><image:loc>https://dideedesigners.in/22-tier-fullfluffy.webp</image:loc></image:image>
+  </url>
+  <url>
+    <loc>https://dideedesigners.in/saree-draping/</loc>
+    <lastmod>2026-11-14</lastmod>
+  </url>
+  <url>
+    <loc>https://dideedesigners.in/faq</loc>
+    <lastmod>2026-11-14</lastmod>
   </url>
 </urlset>
