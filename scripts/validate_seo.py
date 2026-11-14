@@ -21,7 +21,7 @@ FORBIDDEN_TEXT = [r"\bAggregateRating\b", r"\bstar rating", r"★", r"\bcustomer
                   r"\bopen (daily|24)", r"\bopening hours\b", r"\bsince (19|20)\d\d\b", r"\bfounded in\b", r"\byears of experience\b",
                   r"\bwe sell sarees\b",
                   # unverified service promises / quality claims (owner review before re-adding)
-                  r"\bpick-?up\b", r"\bdoorstep\b", r"\bdeliver(y|ies)\b", r"\bexpress\b", r"\bbulk\b", r"\bsilk\b", r"\bbridal\b",
+                  r"\bdoorstep\b", r"\bexpress\b", r"\bbulk\b", r"\bsilk\b", r"\bbridal\b",
                   r"\bappointments?\b", r"\bpersonal care\b", r"\bgentle\b", r"\beven pleats\b"]
 FORBIDDEN_SCHEMA_KEYS = {"aggregateRating", "review", "geo", "openingHours", "openingHoursSpecification", "streetAddress",
                          "postalCode", "foundingDate", "latitude", "longitude", "speakable"}
@@ -197,6 +197,78 @@ if home:
     hv = " ".join(home.text)
     check(all(f"₹{v}" in hv for v in PRICES.values()), "homepage shows ₹250/₹300/₹400")
     check("pre-pleating" in home.h1[0].lower() and "draping" in home.h1[0].lower(), "homepage H1 names both services")
+
+# --- pickup & delivery policy (owner-approved sentence; nothing broader or more specific may appear)
+POLICY = ("For saree pre-pleating orders, pickup and delivery are free for orders of more than 5 sarees from one customer. "
+          "For 5 sarees or fewer, pickup and delivery are chargeable and the charge depends on your location.")
+FREE_RE = r"free[^.]{0,60}(pick-?up|deliver)|(pick-?up|deliver)[^.]{0,60}free"
+_PD = r"(?:pick-?up|deliver\w*)"
+_CUR = r"(?:₹|\brs\b\.?|\binr\b|\brupees?\b)"  # symbol or word, so "100 rupees" / "INR 100" are caught too
+CHARGE_RE = (rf"{_CUR}\s?\d[\d,]*[^.]{{0,40}}{_PD}|{_PD}[^.]{{0,40}}{_CUR}\s?\d"
+             rf"|\d[\d,]*\s?{_CUR}[^.]{{0,40}}{_PD}|{_PD}[^.]{{0,40}}\d[\d,]*\s?{_CUR}")
+_SPEED = r"(?:same[- ]?day|next[- ]?day|overnight|instant(?:ly)?|immediate(?:ly)?|express|quick(?:ly)?|fast)"
+TIME_RE = (rf"{_PD}[^.]{{0,60}}\b(?:within|in|under)\s+\d+\s*(?:hours?|days?|mins?|minutes?)"   # "delivery within 2 days"
+           rf"|\d+[- ]?(?:hours?|days?|mins?|minutes?)\b[^.]{{0,20}}{_PD}"                       # "2-day delivery"
+           rf"|\b{_SPEED}\b[^.]{{0,25}}{_PD}|{_PD}[^.]{{0,25}}\b{_SPEED}\b")                       # "same-day delivery"
+GUARANTEE_RE = rf"guarantee\w*[^.]{{0,40}}{_PD}|{_PD}[^.]{{0,40}}guarantee\w*"
+POLICY_RULES = (("free pickup/delivery claim outside the approved sentence", FREE_RE),
+                ("fixed pickup/delivery charge", CHARGE_RE),
+                ("pickup/delivery time promise", TIME_RE),
+                ("pickup/delivery guarantee", GUARANTEE_RE))
+POLICY_PAGES = ("/saree-pre-pleating/", "/faq")  # the only indexable pages where the policy sentence may appear
+
+
+def _squash(t):
+    return " ".join(t.split())
+
+
+def _json_strings(o, out):
+    if isinstance(o, str):
+        out.append(o)
+    elif isinstance(o, dict):
+        for v in o.values():
+            _json_strings(v, out)
+    elif isinstance(o, list):
+        for v in o:
+            _json_strings(v, out)
+
+
+def _jsonld_text(blocks):
+    out = []
+    for b in blocks:
+        try:
+            _json_strings(json.loads(b), out)
+        except ValueError:
+            pass  # invalid JSON-LD is reported by the JSON-LD checks above
+    return _squash(" . ".join(out))  # ' . ' stops regexes matching across separate strings
+
+
+def _policy_checks(label, text):
+    rest = text.replace(POLICY, "")
+    for what, rx in POLICY_RULES:
+        check(not re.search(rx, rest, re.I), f"no {what} {label}")
+
+
+for f, p in indexable.items():
+    vis = _squash(" ".join(p.text))
+    if p.route in POLICY_PAGES:
+        check(POLICY in vis, f"approved pickup/delivery policy sentence is visible on {p.route}")
+    else:  # pre-pleating-only policy must not leak onto the homepage or the draping page
+        check(POLICY not in vis and POLICY not in _jsonld_text(p.ld),
+              f"approved pickup/delivery policy sentence is not present on {p.route}")
+    _policy_checks(f"on {p.route}", vis)
+    _policy_checks(f"in JSON-LD on {p.route}", _jsonld_text(p.ld))
+    if p.route == "/faq":
+        check(any(POLICY == a for _, a in p.faq), "policy sentence is an exact visible FAQ answer")
+        faq_ld = _jsonld_text(p.ld)
+        check(POLICY in faq_ld, "approved pickup/delivery policy sentence is in the FAQPage JSON-LD")
+for name in ("terms.html", "llms.txt"):
+    t = (ROOT / name).read_text(encoding="utf-8")
+    if name == "terms.html":
+        t = " ".join(pages[ROOT / name].text)
+    t = _squash(t)
+    check(POLICY in t, f"approved pickup/delivery policy sentence is present in {name}")
+    _policy_checks(f"in {name}", t)
 
 # --- links / images
 for f, p in pages.items():
