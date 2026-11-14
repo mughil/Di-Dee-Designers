@@ -202,11 +202,20 @@ if home:
 POLICY = ("For saree pre-pleating orders, pickup and delivery are free for orders of more than 5 sarees from one customer. "
           "For 5 sarees or fewer, pickup and delivery are chargeable and the charge depends on your location.")
 FREE_RE = r"free[^.]{0,60}(pick-?up|deliver)|(pick-?up|deliver)[^.]{0,60}free"
-CHARGE_RE = r"(?:₹|rs\.?\s?)\s?\d[\d,]*[^.]{0,40}(pick-?up|deliver)|(pick-?up|deliver)[^.]{0,40}(?:₹|rs\.?\s?)\s?\d"
-TIME_RE = r"(pick-?up|deliver\w*)[^.]{0,60}\b(within|in|under)\s+\d+\s*(hours?|days?|mins?|minutes?)"
+_PD = r"(?:pick-?up|deliver\w*)"
+_CUR = r"(?:₹|\brs\b\.?|\binr\b|\brupees?\b)"  # symbol or word, so "100 rupees" / "INR 100" are caught too
+CHARGE_RE = (rf"{_CUR}\s?\d[\d,]*[^.]{{0,40}}{_PD}|{_PD}[^.]{{0,40}}{_CUR}\s?\d"
+             rf"|\d[\d,]*\s?{_CUR}[^.]{{0,40}}{_PD}|{_PD}[^.]{{0,40}}\d[\d,]*\s?{_CUR}")
+_SPEED = r"(?:same[- ]?day|next[- ]?day|overnight|instant(?:ly)?|immediate(?:ly)?|express|quick(?:ly)?|fast)"
+TIME_RE = (rf"{_PD}[^.]{{0,60}}\b(?:within|in|under)\s+\d+\s*(?:hours?|days?|mins?|minutes?)"   # "delivery within 2 days"
+           rf"|\d+[- ]?(?:hours?|days?|mins?|minutes?)\b[^.]{{0,20}}{_PD}"                       # "2-day delivery"
+           rf"|\b{_SPEED}\b[^.]{{0,25}}{_PD}|{_PD}[^.]{{0,25}}\b{_SPEED}\b")                       # "same-day delivery"
+GUARANTEE_RE = rf"guarantee\w*[^.]{{0,40}}{_PD}|{_PD}[^.]{{0,40}}guarantee\w*"
 POLICY_RULES = (("free pickup/delivery claim outside the approved sentence", FREE_RE),
                 ("fixed pickup/delivery charge", CHARGE_RE),
-                ("pickup/delivery time promise", TIME_RE))
+                ("pickup/delivery time promise", TIME_RE),
+                ("pickup/delivery guarantee", GUARANTEE_RE))
+POLICY_PAGES = ("/saree-pre-pleating/", "/faq")  # the only indexable pages where the policy sentence may appear
 
 
 def _squash(t):
@@ -242,8 +251,11 @@ def _policy_checks(label, text):
 
 for f, p in indexable.items():
     vis = _squash(" ".join(p.text))
-    if p.route in ("/saree-pre-pleating/", "/faq"):
+    if p.route in POLICY_PAGES:
         check(POLICY in vis, f"approved pickup/delivery policy sentence is visible on {p.route}")
+    else:  # pre-pleating-only policy must not leak onto the homepage or the draping page
+        check(POLICY not in vis and POLICY not in _jsonld_text(p.ld),
+              f"approved pickup/delivery policy sentence is not present on {p.route}")
     _policy_checks(f"on {p.route}", vis)
     _policy_checks(f"in JSON-LD on {p.route}", _jsonld_text(p.ld))
     if p.route == "/faq":

@@ -25,6 +25,12 @@ ATTACKS = {
     "time promise": (" Delivery within 2 days.", "pickup/delivery time promise"),
     "fixed charge": (" Pickup and delivery cost ₹50.", "fixed pickup/delivery charge"),
     "free claim": (" Free delivery on all orders.", "free pickup/delivery claim outside the approved sentence"),
+    "wrong threshold": (" Pickup is free for 5 sarees.", "free pickup/delivery claim outside the approved sentence"),
+    "charge without symbol": (" Delivery charge is 100 rupees.", "fixed pickup/delivery charge"),
+    "charge in INR": (" Pickup and delivery cost INR 100.", "fixed pickup/delivery charge"),
+    "number-less time promise": (" Same-day delivery.", "pickup/delivery time promise"),
+    "n-day delivery": (" We offer 2-day delivery.", "pickup/delivery time promise"),
+    "guarantee": (" Guaranteed delivery.", "pickup/delivery guarantee"),
 }
 
 # location -> (file, which occurrence of the policy sentence to alter, suffix of the failing check name)
@@ -86,10 +92,73 @@ def _make_test(location, attack):
     return test
 
 
+def _slug(s):
+    return s.replace(" ", "_").replace("(", "").replace(")", "").replace(".", "_").replace("-", "_")
+
+
 for _loc in LOCATIONS:
     for _atk in ATTACKS:
-        _name = "test_fails_" + (_atk + "_" + _loc).replace(" ", "_").replace("(", "").replace(")", "").replace(".", "_").replace("-", "_")
-        setattr(PolicyChecks, _name, _make_test(_loc, _atk))
+        setattr(PolicyChecks, "test_fails_" + _slug(_atk + "_" + _loc), _make_test(_loc, _atk))
+
+
+# --- the approved sentence itself must not be weakened in any of its locations ---------------------
+SENTENCE_EDITS = {
+    "prefix removed": lambda s: s.replace("For saree pre-pleating orders, pickup", "Pickup", 1),
+    "threshold 5 or more": lambda s: s.replace("more than 5 sarees", "5 or more sarees", 1),
+    "threshold exactly 5 free": lambda s: s.replace("For 5 sarees or fewer, pickup and delivery are chargeable",
+                                                   "For 5 sarees or fewer, pickup and delivery are free", 1),
+}
+
+
+def _make_sentence_test(location, edit):
+    rel, nth, _ = LOCATIONS[location]
+
+    def test(self):
+        root = self.fresh_copy()
+        path = root / rel
+        text = path.read_text(encoding="utf-8", newline="")
+        idx = -1
+        for _ in range(nth + 1):
+            idx = text.index(POLICY, idx + 1)
+        path.write_text(text[:idx] + SENTENCE_EDITS[edit](POLICY) + text[idx + len(POLICY):], encoding="utf-8", newline="")
+        code, out = run_validator(root)
+        self.assertEqual(code, 1, f"validator should reject '{edit}' in {location}")
+        self.assertIn("FAIL", out)
+    return test
+
+
+for _loc in LOCATIONS:
+    for _edit in SENTENCE_EDITS:
+        setattr(PolicyChecks, "test_rejects_" + _slug(_edit + "_" + _loc), _make_sentence_test(_loc, _edit))
+
+
+# --- the pre-pleating-only policy must not appear on the homepage or the draping page ----------------
+MISPLACED = {
+    "draping page (visible)": ("saree-draping/index.html", "<h2>Service areas</h2>", False, "/saree-draping/"),
+    "homepage (visible)": ("index.html", '<section class="final-cta">', False, "/"),
+    "draping page (JSON-LD)": ("saree-draping/index.html", '"description": "', True, "/saree-draping/"),
+    "homepage (JSON-LD)": ("index.html", '"description": "', True, "/"),
+}
+
+
+def _make_misplaced_test(location):
+    rel, anchor, in_jsonld, route = MISPLACED[location]
+
+    def test(self):
+        root = self.fresh_copy()
+        path = root / rel
+        text = path.read_text(encoding="utf-8", newline="")
+        i = text.index(anchor)
+        add = POLICY + " " if in_jsonld else f"<p>{POLICY}</p>"
+        path.write_text(text[:i + len(anchor)] + add + text[i + len(anchor):], encoding="utf-8", newline="")
+        code, out = run_validator(root)
+        self.assertEqual(code, 1, f"validator should reject the policy sentence on the {location}")
+        self.assertIn(f"FAIL approved pickup/delivery policy sentence is not present on {route}", out)
+    return test
+
+
+for _loc in MISPLACED:
+    setattr(PolicyChecks, "test_rejects_policy_on_" + _slug(_loc), _make_misplaced_test(_loc))
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
