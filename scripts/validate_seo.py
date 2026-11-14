@@ -188,8 +188,8 @@ for f, p in indexable.items():
     vis = " ".join(p.text)
     for pat in FORBIDDEN_TEXT:
         check(not re.search(pat, vis, re.I), f"no forbidden claim /{pat}/ in visible text of {p.route}")
-    if p.route == "/saree-draping/":
-        check("₹" not in vis, "draping page lists no invented price")
+    if p.route in ("/saree-draping/", "/saree-draping-classes/"):
+        check("₹" not in vis, f"{p.route} lists no invented price")
     if p.route == "/saree-pre-pleating/":
         check(all(f"₹{v}" in vis for v in PRICES.values()), "pre-pleating page shows ₹250/₹300/₹400")
 home = next((p for p in indexable.values() if p.route == "/"), None)
@@ -270,6 +270,44 @@ for name in ("terms.html", "llms.txt"):
     check(POLICY in t, f"approved pickup/delivery policy sentence is present in {name}")
     _policy_checks(f"in {name}", t)
 
+# --- draping classes: genuine offering, but fees/duration/schedule/batch/qualifications are NOT verified
+CLASS_PAGE = "/saree-draping-classes/"
+_CW = r"(?:class(?:es)?|course|training|workshop)"
+_UNIT = r"(?:minutes?|mins?|hours?|days?|weeks?|months?|sessions?|students?|seats?|participants?|people|persons?)"
+CLASS_RULES = (
+    ("class fee or price", rf"{_CW}[^.]{{0,60}}{_CUR}\s?\d|{_CUR}\s?\d[\d,]*[^.]{{0,60}}{_CW}|{_CW}\s+(?:fees?|cost|price)\b[^.]{{0,20}}\d"
+                           rf"|\bfree\b[^.]{{0,30}}\b{_CW}|\b{_CW}[^.]{{0,30}}\bfree\b|\bdiscount\w*[^.]{{0,30}}\b{_CW}"),
+    ("class duration, schedule or batch claim", rf"{_CW}[^.]{{0,60}}\b\d+\s*(?:-|to )?\s*{_UNIT}\b|\b\d+[- ]?{_UNIT}\b[^.]{{0,20}}{_CW}"
+                                                 rf"|\bbatch(?:es)?\b|{_CW}[^.]{{0,60}}\b(?:weekends?|weekdays?|mornings?|evenings?|daily|weekly|monthly)\b"
+                                                 rf"|\b(?:weekends?|weekdays?|mornings?|evenings?|daily|weekly|monthly)\b[^.]{{0,30}}{_CW}"),
+    ("class certificate or qualification claim", r"\b(?:certificates?|certification|diploma|qualified|accredited|licensed|placement|job guarantee)\b"),
+)
+
+
+def _class_checks(label, text):
+    for what, rx in CLASS_RULES:
+        check(not re.search(rx, text, re.I), f"no {what} {label}")
+
+
+for f, p in indexable.items():
+    _class_checks(f"on {p.route}", _squash(" ".join(p.text)))
+    _class_checks(f"in JSON-LD on {p.route}", _jsonld_text(p.ld))
+_class_checks("in llms.txt", _squash((ROOT / "llms.txt").read_text(encoding="utf-8")))
+_cp = next((p for p in indexable.values() if p.route == CLASS_PAGE), None)
+check(_cp is not None, f"{CLASS_PAGE} exists and is indexable")
+if _cp:
+    _cv = _squash(" ".join(_cp.text)).lower()
+    check("draping classes" in _cp.h1[0].lower(), "classes page H1 names saree draping classes")
+    check("whatsapp" in _cv and "+91 90030 37820" in _cv, "classes page points to WhatsApp +91 90030 37820")
+    check("confirmed" in _cv and "fees" in _cv, "classes page says fees/details are confirmed on WhatsApp")
+    check('"areaServed"' not in _cp.ld[0], "classes page schema claims no unverified areaServed", False)
+    check('"offers"' not in _cp.ld[0] and '"price"' not in _cp.ld[0], "classes page schema has no offer or price")
+for _p in indexable.values():  # internal linking between the services and the classes page
+    if _p.route in ("/saree-draping/", "/faq", CLASS_PAGE, "/saree-pre-pleating/"):
+        check(CLASS_PAGE in _p.links, f"{_p.route} links to {CLASS_PAGE}")
+if _cp:
+    check("/saree-draping/" in _cp.links, "classes page links back to /saree-draping/")
+
 # --- links / images
 for f, p in pages.items():
     bad = [h for h in p.links if not resolve(h)]
@@ -305,7 +343,7 @@ check(not re.search(r"^\s*Disallow:\s*/\s*$", rb, re.M), "robots.txt does not bl
 
 # --- llms.txt
 ll = (ROOT / "llms.txt").read_text(encoding="utf-8")
-for u in ("/", "/saree-pre-pleating/", "/saree-draping/", "/faq"):
+for u in ("/", "/saree-pre-pleating/", "/saree-draping/", CLASS_PAGE, "/faq"):
     check(SITE + u in ll, f"llms.txt links {SITE}{u}", False)
 check(all(f"₹{v}" in ll for v in PRICES.values()), "llms.txt has the three verified prices")
 
