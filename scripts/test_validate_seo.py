@@ -160,5 +160,87 @@ def _make_misplaced_test(location):
 for _loc in MISPLACED:
     setattr(PolicyChecks, "test_rejects_policy_on_" + _slug(_loc), _make_misplaced_test(_loc))
 
+# --- draping classes: unverified fee/duration/schedule/batch/certificate claims must be rejected -------------
+CLASS_ANCHOR = "Di Dee Designers offers saree draping classes in Tiruppur."
+CLASS_ATTACKS = {
+    "fee symbol": (" Class fee is ₹2000.", "class fee or price"),
+    "fee in rupees": (" Class fee is 2000 rupees.", "class fee or price"),
+    "free class": (" Free demo class.", "class fee or price"),
+    "duration": (" The course runs for 4 weeks.", "class duration, schedule or batch claim"),
+    "batch": (" Next batch starts soon.", "class duration, schedule or batch claim"),
+    "schedule": (" Classes are held on weekends.", "class duration, schedule or batch claim"),
+    "certificate": (" A certificate is provided.", "class certificate or qualification claim"),
+}
+# location -> (file, which occurrence of the anchor sentence, suffix of the failing check name)
+CLASS_LOCATIONS = {
+    "classes page": ("saree-draping-classes/index.html", 0, "on /saree-draping-classes/"),
+    "draping page": ("saree-draping/index.html", 0, "on /saree-draping/"),
+    "FAQ page (visible)": ("faq.html", 1, "on /faq"),
+    "FAQ page (JSON-LD)": ("faq.html", 0, "in JSON-LD on /faq"),
+    "llms.txt": ("llms.txt", 0, "in llms.txt"),
+}
+
+
+class ClassChecks(unittest.TestCase):
+    fresh_copy = PolicyChecks.fresh_copy
+
+    def test_classes_page_passes(self):
+        code, out = run_validator(ROOT)
+        self.assertEqual(code, 0, out[-800:])
+        for needle in ("PASS /saree-draping-classes/ exists and is indexable",
+                       "PASS /faq links to /saree-draping-classes/",
+                       "PASS classes page links back to /saree-draping/",
+                       "PASS /saree-draping-classes/ lists no invented price"):
+            self.assertIn(needle, out)
+        self.assertNotIn("FAIL", out)
+
+    def test_faq_link_removed_fails(self):
+        root = self.fresh_copy()
+        path = root / "faq.html"
+        text = path.read_text(encoding="utf-8", newline="")
+        path.write_text(text.replace('href="/saree-draping-classes/"', 'href="/saree-draping/"'), encoding="utf-8", newline="")  # drops every link to the classes page
+        code, out = run_validator(root)
+        self.assertEqual(code, 1)
+        self.assertIn("FAIL /faq links to /saree-draping-classes/", out)
+
+    def test_sitemap_missing_classes_fails(self):
+        root = self.fresh_copy()
+        path = root / "sitemap.xml"
+        text = path.read_text(encoding="utf-8", newline="")
+        s = text.index("  <url>\r\n    <loc>https://dideedesigners.in/saree-draping-classes/")
+        e = text.index("</url>", s) + len("</url>\r\n")
+        path.write_text(text[:s] + text[e:], encoding="utf-8", newline="")
+        code, out = run_validator(root)
+        self.assertEqual(code, 1)
+        self.assertIn("FAIL sitemap URLs == indexable canonicals", out)
+
+
+def _make_class_test(location, attack):
+    rel, nth, where = CLASS_LOCATIONS[location]
+    extra, rule = CLASS_ATTACKS[attack]
+
+    def test(self):
+        root = self.fresh_copy()
+        inject_after(root, rel, CLASS_ANCHOR, nth, extra)
+        code, out = run_validator(root)
+        self.assertEqual(code, 1, f"validator should exit 1 for {attack} in {location}")
+        self.assertIn(f"FAIL no {rule} {where}", out)
+    return test
+
+
+def inject_after(root, rel, anchor, nth, extra):
+    path = Path(root) / rel
+    text = path.read_text(encoding="utf-8", newline="")
+    idx = -1
+    for _ in range(nth + 1):
+        idx = text.index(anchor, idx + 1)
+    end = idx + len(anchor)
+    path.write_text(text[:end] + extra + text[end:], encoding="utf-8", newline="")
+
+
+for _loc in CLASS_LOCATIONS:
+    for _atk in CLASS_ATTACKS:
+        setattr(ClassChecks, "test_fails_" + _slug(_atk + "_" + _loc), _make_class_test(_loc, _atk))
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
