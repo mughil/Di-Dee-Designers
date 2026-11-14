@@ -199,7 +199,7 @@ if home:
     check("pre-pleating" in home.h1[0].lower() and "draping" in home.h1[0].lower(), "homepage H1 names both services")
 
 # --- pickup & delivery policy (owner-approved sentence; nothing broader or more specific may appear)
-POLICY = ("Pickup and delivery are free for orders of more than 5 sarees from one customer. "
+POLICY = ("For saree pre-pleating orders, pickup and delivery are free for orders of more than 5 sarees from one customer. "
           "For 5 sarees or fewer, pickup and delivery are chargeable and the charge depends on your location.")
 FREE_RE = r"free[^.]{0,60}(pick-?up|deliver)|(pick-?up|deliver)[^.]{0,60}free"
 CHARGE_RE = r"(?:₹|rs\.?\s?)\s?\d[\d,]*[^.]{0,40}(pick-?up|deliver)|(pick-?up|deliver)[^.]{0,40}(?:₹|rs\.?\s?)\s?\d"
